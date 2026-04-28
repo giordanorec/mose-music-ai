@@ -985,46 +985,121 @@
         /* ============ POST-IT (anotações livres) ============ */
         .post-it {
             position: absolute;
-            min-width: 120px; min-height: 90px;
-            max-width: 240px;
-            padding: 10px 12px;
-            background: var(--cat-note);
-            color: var(--ink);
-            border-radius: 4px;
-            font-size: 0.78rem;
-            line-height: 1.35;
-            box-shadow: 2px 4px 8px rgba(21,21,21,0.18);
+            width: 190px;
+            min-height: 150px;
+            background: linear-gradient(170deg, #FFE873 0%, #FFD93D 55%, #F4C636 100%);
+            color: #2A2410;
+            border-radius: 1px;
+            font-family: 'Caveat', 'Marker Felt', 'Comic Sans MS', cursive, sans-serif;
+            box-shadow:
+                0 1px 1px rgba(0,0,0,0.12),
+                4px 6px 14px -2px rgba(0,0,0,0.22),
+                10px 18px 30px -8px rgba(0,0,0,0.12);
+            transform: rotate(-1.6deg);
             z-index: 14;
-            cursor: move;
-            transform: rotate(-1deg);
-            font-family: 'Caveat', 'Marker Felt', cursive, sans-serif;
+            transition: transform 0.18s ease, box-shadow 0.18s ease;
+            display: flex;
+            flex-direction: column;
         }
+        .post-it:hover { transform: rotate(-0.6deg) translateY(-1px); }
 
-        .post-it[contenteditable="true"]:focus {
-            outline: 2px dashed var(--ink-soft);
-            outline-offset: 2px;
+        /* Fita adesiva no topo */
+        .post-it::before {
+            content: '';
+            position: absolute;
+            top: -11px; left: 50%;
+            transform: translateX(-50%) rotate(-3deg);
+            width: 70px; height: 18px;
+            background: linear-gradient(180deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.3) 100%);
+            border-left: 1px solid rgba(0,0,0,0.05);
+            border-right: 1px solid rgba(0,0,0,0.05);
+            box-shadow: 0 2px 3px rgba(0,0,0,0.1);
+            pointer-events: none;
+        }
+        /* Canto dobrado (bottom-right) */
+        .post-it::after {
+            content: '';
+            position: absolute;
+            bottom: 0; right: 0;
+            width: 0; height: 0;
+            border-style: solid;
+            border-width: 0 0 18px 18px;
+            border-color: transparent transparent rgba(0,0,0,0.15) transparent;
+            filter: drop-shadow(-1px -1px 1px rgba(0,0,0,0.1));
+            pointer-events: none;
         }
 
         .post-it.selected {
-            box-shadow: 2px 4px 8px rgba(21,21,21,0.18), 0 0 0 3px var(--t-ctrl);
+            box-shadow:
+                0 0 0 2px var(--t-ctrl),
+                4px 6px 14px -2px rgba(0,0,0,0.22),
+                10px 18px 30px -8px rgba(0,0,0,0.12);
         }
 
-        .post-it .delete-btn-note {
-            position: absolute; top: -8px; right: -8px;
-            width: 22px; height: 22px;
-            background: var(--t-ctrl);
-            border: 2px solid var(--paper-0);
+        .post-it-header {
+            height: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 4px;
+            padding: 4px 6px 0;
+            cursor: grab;
+            user-select: none;
+            flex-shrink: 0;
+        }
+        .post-it-header:active { cursor: grabbing; }
+
+        .post-it-toggle, .post-it .delete-btn-note {
+            width: 18px; height: 18px;
+            display: flex; align-items: center; justify-content: center;
             border-radius: 50%;
-            color: #FFF;
-            font-size: 0.85rem; font-weight: 800;
-            display: none;
-            align-items: center; justify-content: center;
-            cursor: pointer;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+            background: rgba(0,0,0,0.07);
+            color: #5C4D00;
+            font-size: 13px;
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            font-weight: 700;
             line-height: 1;
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s;
+            border: none;
+            padding: 0;
+        }
+        .post-it-toggle:hover { background: rgba(0,0,0,0.18); }
+        .post-it .delete-btn-note { display: none; }
+        .post-it .delete-btn-note:hover { background: rgba(220,38,38,0.25); color: #B91C1C; }
+        .post-it.selected .delete-btn-note { display: flex; }
+
+        .post-it-body {
+            flex: 1;
+            padding: 4px 16px 18px;
+            font-size: 1.15rem;
+            line-height: 1.25;
+            min-height: 90px;
+            cursor: text;
+            outline: none;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            white-space: pre-wrap;
+        }
+        .post-it-body:empty::before {
+            content: 'Anotação...';
+            opacity: 0.42;
+            pointer-events: none;
+        }
+        .post-it-body:focus {
+            background: rgba(255,255,255,0.18);
+            border-radius: 2px;
         }
 
-        .post-it.selected .delete-btn-note { display: flex; }
+        .post-it.collapsed {
+            width: auto;
+            min-width: 110px;
+            min-height: 0;
+        }
+        .post-it.collapsed .post-it-body { display: none; }
+        .post-it.collapsed .post-it-header { padding: 6px 10px; }
+        .post-it.collapsed::before { top: -9px; height: 14px; width: 50px; }
+        .post-it.collapsed::after { display: none; }
 
         /* ============ DELETE PEÇA ============ */
         .delete-btn {
@@ -3349,16 +3424,20 @@
         window.addPostIt = function() {
             const surface = document.getElementById('surface');
             const sRect = surface.getBoundingClientRect();
-            // Coloca no centro visível da mesa
-            const x = (sRect.width / 2 - 60 - pan.x) / zoom;
-            const y = (sRect.height / 2 - 40 - pan.y) / zoom;
+            const x = (sRect.width / 2 - 95 - pan.x) / zoom;
+            const y = (sRect.height / 2 - 75 - pan.y) / zoom;
             const note = {
                 id: `note_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-                x, y, text: 'Anotação...'
+                x, y, text: ''
             };
             postIts.push(note);
-            renderPostIt(note);
+            const el = renderPostIt(note);
             saveWorkflow();
+            // Foca pra começar a digitar imediatamente
+            requestAnimationFrame(() => {
+                const body = el.querySelector('.post-it-body');
+                if (body) body.focus();
+            });
         };
 
         function renderPostIt(note) {
@@ -3367,44 +3446,64 @@
             el.dataset.noteId = note.id;
             el.style.left = note.x + 'px';
             el.style.top = note.y + 'px';
-            el.contentEditable = !note.collapsed;
-            el.textContent = note.text;
-            el.innerHTML += '<div class="delete-btn-note" data-action="delete-note">×</div>';
-            el.innerHTML += `<div class="post-it-toggle" data-action="toggle-note" title="${note.collapsed ? 'Expandir' : 'Recolher'}">${note.collapsed ? '+' : '−'}</div>`;
-            // Drag
-            el.addEventListener('pointerdown', e => {
-                if (e.target.dataset.action === 'delete-note') {
+
+            const header = document.createElement('div');
+            header.className = 'post-it-header';
+            header.innerHTML = `
+                <div class="post-it-toggle" data-action="toggle-note" title="${note.collapsed ? 'Expandir' : 'Recolher'}">${note.collapsed ? '+' : '−'}</div>
+                <button class="delete-btn-note" data-action="delete-note" title="Apagar">×</button>
+            `;
+
+            const body = document.createElement('div');
+            body.className = 'post-it-body';
+            // 'plaintext-only' preserva quebras de linha como \n e bloqueia HTML
+            body.contentEditable = 'plaintext-only';
+            body.spellcheck = false;
+            body.textContent = note.text || '';
+
+            el.appendChild(header);
+            el.appendChild(body);
+
+            // Header → drag (ou ações dos botões)
+            header.addEventListener('pointerdown', e => {
+                const action = e.target.dataset.action;
+                if (action === 'delete-note') {
                     e.stopPropagation();
                     deletePostIt(note.id);
                     return;
                 }
-                if (e.target.dataset.action === 'toggle-note') {
+                if (action === 'toggle-note') {
                     e.stopPropagation();
                     e.preventDefault();
                     togglePostIt(note.id);
                     return;
                 }
-                if (e.target === el && !el.matches(':focus')) {
-                    // Click no post-it colapsado expande
-                    if (note.collapsed) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        togglePostIt(note.id);
-                        return;
-                    }
-                    e.preventDefault();
-                    onPostItPointerDown(e, el, note);
-                }
+                e.preventDefault();
+                onPostItPointerDown(e, el, note);
             });
-            el.addEventListener('blur', () => {
-                note.text = el.textContent.replace('×', '').trim();
-                saveWorkflow();
-            });
-            el.addEventListener('click', () => {
+
+            // Click no post-it (qualquer parte) → seleciona
+            el.addEventListener('mousedown', () => {
                 clearSelection();
                 el.classList.add('selected');
             });
+
+            // Click no body quando colapsado → expande
+            if (note.collapsed) {
+                body.style.pointerEvents = 'none';
+            }
+
+            // Salva ao perder foco
+            body.addEventListener('blur', () => {
+                note.text = body.textContent;
+                saveWorkflow();
+            });
+
+            // Impede que tecla Delete dentro do body apague o post-it
+            body.addEventListener('keydown', e => e.stopPropagation());
+
             document.getElementById('canvas').appendChild(el);
+            return el;
         }
 
         let postItDrag = null;
