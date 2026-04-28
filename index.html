@@ -461,10 +461,135 @@
         }
 
         /* ============ INVENTÁRIO ============ */
-        .inventory {
+        /* Wrapper que segura inventory (scroll) + ai-panel (sticky no fundo) */
+        .inventory-wrap {
+            display: flex;
+            flex-direction: column;
             background: var(--paper-1);
             border-right: 2px solid var(--paper-2);
-            overflow-y: auto; overflow-x: hidden;
+            overflow: hidden;
+            min-height: 0;
+        }
+        .inventory {
+            flex: 1 1 auto;
+            overflow-y: auto;
+            overflow-x: hidden;
+            min-height: 0;
+        }
+
+        /* ============ AI PANEL (fixo no fundo do side bar) ============ */
+        .ai-panel {
+            flex-shrink: 0;
+            border-top: 1px solid var(--paper-2);
+            padding: 10px 12px 12px;
+            background: linear-gradient(180deg, var(--paper-1) 0%, var(--paper-0) 100%);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .ai-panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.72rem;
+            color: var(--ink-soft);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
+        .ai-panel-title { color: #C8B5FF; }
+        .ai-panel-status { font-size: 0.66rem; color: var(--ink-soft); text-transform: none; letter-spacing: 0; }
+        .ai-panel-status.signed-in::before { content: '● '; color: #5BD18E; }
+        .ai-prompt-inline {
+            width: 100%;
+            min-height: 64px;
+            max-height: 160px;
+            padding: 9px 11px;
+            background: var(--paper-0);
+            border: 1px solid var(--paper-2);
+            border-radius: 8px;
+            color: var(--ink);
+            font-family: inherit;
+            font-size: 0.82rem;
+            line-height: 1.45;
+            resize: vertical;
+            outline: none;
+            box-sizing: border-box;
+            transition: border-color 0.15s, background 0.15s;
+        }
+        .ai-prompt-inline:focus {
+            border-color: rgba(168,140,255,0.6);
+            background: rgba(168,140,255,0.05);
+        }
+        .ai-prompt-inline::placeholder { color: var(--ink-soft); opacity: 0.6; }
+        .ai-prompt-inline:disabled { opacity: 0.5; cursor: not-allowed; }
+        .ai-submit-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            width: 100%;
+            padding: 9px 12px;
+            background: linear-gradient(135deg, rgba(154,220,255,0.18), rgba(168,140,255,0.22));
+            border: 1px solid rgba(168,140,255,0.45);
+            border-radius: 8px;
+            color: #FFF;
+            font-weight: 600;
+            font-size: 0.82rem;
+            cursor: pointer;
+            transition: all 0.15s;
+            font-family: inherit;
+        }
+        .ai-submit-btn:hover:not(:disabled) {
+            background: linear-gradient(135deg, rgba(154,220,255,0.32), rgba(168,140,255,0.38));
+            border-color: rgba(168,140,255,0.75);
+        }
+        .ai-submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .ai-submit-btn .spinner {
+            width: 12px; height: 12px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: #FFF;
+            border-radius: 50%;
+            animation: ai-spin 0.7s linear infinite;
+        }
+        @keyframes ai-spin { to { transform: rotate(360deg); } }
+        .ai-error {
+            font-size: 0.72rem;
+            color: var(--t-ctrl);
+            line-height: 1.4;
+            padding: 6px 10px;
+            background: rgba(220,38,38,0.08);
+            border-radius: 6px;
+            border-left: 2px solid var(--t-ctrl);
+        }
+        .ai-locked {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 10px;
+            background: var(--paper-0);
+            border: 1px dashed var(--paper-3);
+            border-radius: 8px;
+            color: var(--ink-soft);
+            font-size: 0.78rem;
+            line-height: 1.4;
+            text-align: center;
+        }
+        .ai-locked-cta {
+            display: inline-block;
+            padding: 7px 14px;
+            background: rgba(168,140,255,0.18);
+            border: 1px solid rgba(168,140,255,0.45);
+            border-radius: 6px;
+            color: #C8B5FF;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.78rem;
+            transition: all 0.15s;
+        }
+        .ai-locked-cta:hover {
+            background: rgba(168,140,255,0.3);
+            color: #FFF;
         }
 
         /* Scrollbar customizada pra fundo escuro */
@@ -1492,10 +1617,6 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
                     <span>Templates</span>
                 </button>
-                <button class="header-btn ai-btn" onclick="openAIModal()" title="Gerar workflow a partir de descrição em linguagem natural">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.5 4.5L18 8l-4.5 1.5L12 14l-1.5-4.5L6 8l4.5-1.5L12 2z"/><path d="M5 16l.7 2.1L8 19l-2.3.7L5 22l-.7-2.1L2 19l2.3-.7L5 16z"/><path d="M19 14l.5 1.5L21 16l-1.5.5L19 18l-.5-1.5L17 16l1.5-.5L19 14z"/></svg>
-                    <span>Gerar com IA</span>
-                </button>
                 <button class="header-btn" onclick="addPostIt()" title="Adicionar nota adesiva">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                     <span>Nota</span>
@@ -1518,7 +1639,10 @@
             </div>
         </div>
 
-        <aside class="inventory" id="inventory"></aside>
+        <aside class="inventory-wrap">
+            <div class="inventory" id="inventory"></div>
+            <div class="ai-panel" id="ai-panel"></div>
+        </aside>
 
         <main class="surface" id="surface">
             <div class="surface-grid"></div>
@@ -3370,7 +3494,122 @@
                 t.textContent = 'Entrar';
                 w.title = 'Login Google (para usar IA)';
             }
+            renderAIPanel();
         }
+
+        function renderAIPanel() {
+            const panel = document.getElementById('ai-panel');
+            if (!panel) return;
+            const isSignedIn = !!aiAuthState.email;
+            const isAllowed = isSignedIn && (
+                aiAuthState.allowedEmails.length === 0 ||
+                aiAuthState.allowedEmails.includes(aiAuthState.email)
+            );
+
+            if (!isSignedIn) {
+                panel.innerHTML = `
+                    <div class="ai-panel-header">
+                        <span class="ai-panel-title">✨ Gerar com IA</span>
+                    </div>
+                    <div class="ai-locked">
+                        Faça login pra montar workflows automaticamente a partir de uma descrição.
+                        <span class="ai-locked-cta" onclick="openAuthModal()">Entrar com Google</span>
+                    </div>
+                `;
+                return;
+            }
+            if (!isAllowed) {
+                panel.innerHTML = `
+                    <div class="ai-panel-header">
+                        <span class="ai-panel-title">✨ Gerar com IA</span>
+                        <span class="ai-panel-status signed-in">${escapeHtml(aiAuthState.email)}</span>
+                    </div>
+                    <div class="ai-locked">
+                        ⚠ Conta sem acesso à API.<br>
+                        <small>Apenas emails autorizados podem gerar workflows.</small>
+                    </div>
+                `;
+                return;
+            }
+
+            // Preserva o que estava digitado, se houver
+            const prev = document.getElementById('ai-prompt-inline')?.value || '';
+            panel.innerHTML = `
+                <div class="ai-panel-header">
+                    <span class="ai-panel-title">✨ Gerar com IA</span>
+                    <span class="ai-panel-status signed-in">${escapeHtml(aiAuthState.email.split('@')[0])}</span>
+                </div>
+                <textarea id="ai-prompt-inline" class="ai-prompt-inline"
+                    placeholder="Descreva o sistema… ex: 'transcrever podcast e gerar resumo'"
+                    rows="3"></textarea>
+                <button class="ai-submit-btn" id="ai-submit-btn-inline" onclick="runAIInline()">
+                    <span id="ai-submit-label">Gerar workflow</span>
+                </button>
+                <div id="ai-error-inline" style="display:none;" class="ai-error"></div>
+            `;
+            const ta = document.getElementById('ai-prompt-inline');
+            if (ta) {
+                ta.value = prev;
+                ta.addEventListener('keydown', e => {
+                    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                        e.preventDefault();
+                        runAIInline();
+                    }
+                });
+            }
+        }
+
+        function escapeHtml(s) {
+            return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        }
+
+        window.runAIInline = async function() {
+            const ta = document.getElementById('ai-prompt-inline');
+            const btn = document.getElementById('ai-submit-btn-inline');
+            const lbl = document.getElementById('ai-submit-label');
+            const errEl = document.getElementById('ai-error-inline');
+            const prompt = (ta?.value || '').trim();
+            if (!prompt) { ta?.focus(); return; }
+            if (!aiAuthState.jwt) {
+                errEl.textContent = 'Você precisa estar logado.';
+                errEl.style.display = 'block';
+                return;
+            }
+            btn.disabled = true;
+            ta.disabled = true;
+            lbl.innerHTML = '<span class="spinner"></span> Gerando…';
+            errEl.style.display = 'none';
+            try {
+                const catalog = buildAICatalog();
+                const res = await fetch('/api/generate-workflow', {
+                    method: 'POST',
+                    headers: {
+                        'content-type': 'application/json',
+                        'authorization': 'Bearer ' + aiAuthState.jwt,
+                    },
+                    body: JSON.stringify({ prompt, catalog }),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    if (res.status === 401) {
+                        signOut();
+                        throw new Error('Sessão expirou — faça login de novo');
+                    }
+                    const detail = data.detail ? ` — ${data.detail}` : '';
+                    throw new Error((data.error || `Erro ${res.status}`) + detail);
+                }
+                applyAIWorkflow(data.workflow);
+                ta.value = '';
+                showToast(`✨ "${data.workflow.title || 'Workflow'}" criado`);
+            } catch (e) {
+                errEl.textContent = '❌ ' + (e.message || String(e));
+                errEl.style.display = 'block';
+            } finally {
+                btn.disabled = false;
+                ta.disabled = false;
+                lbl.textContent = 'Gerar workflow';
+            }
+        };
 
         window.openAuthModal = function() {
             const root = document.getElementById('modal-root');
