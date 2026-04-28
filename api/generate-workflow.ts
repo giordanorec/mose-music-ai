@@ -1,6 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Anthropic from '@anthropic-ai/sdk';
-import { jwtVerify, createRemoteJWKSet } from 'jose';
 
 export const config = { maxDuration: 60 };
 
@@ -8,11 +7,27 @@ const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const ALLOWED_EMAILS = (process.env.ALLOWED_EMAILS || 'grec@cin.ufpe.br,giordanorec@gmail.com')
     .split(',').map(e => e.trim().toLowerCase()).filter(Boolean);
 
-const JWKS = createRemoteJWKSet(new URL('https://www.googleapis.com/oauth2/v3/certs'));
+// `jose` é ESM-only (v6); Vercel compila a function como CJS, então usamos dynamic import().
+let _josePromise: Promise<typeof import('jose')> | null = null;
+function loadJose() {
+    if (!_josePromise) _josePromise = import('jose');
+    return _josePromise;
+}
+let _jwksPromise: Promise<any> | null = null;
+async function getJWKS() {
+    if (!_jwksPromise) {
+        _jwksPromise = loadJose().then(jose =>
+            jose.createRemoteJWKSet(new URL('https://www.googleapis.com/oauth2/v3/certs'))
+        );
+    }
+    return _jwksPromise;
+}
 
 async function verifyGoogleJWT(token: string): Promise<{ email: string; name?: string }> {
     if (!GOOGLE_CLIENT_ID) throw new Error('GOOGLE_CLIENT_ID env var não configurada');
-    const { payload } = await jwtVerify(token, JWKS, {
+    const jose = await loadJose();
+    const jwks = await getJWKS();
+    const { payload } = await jose.jwtVerify(token, jwks, {
         issuer: ['https://accounts.google.com', 'accounts.google.com'],
         audience: GOOGLE_CLIENT_ID,
     });
