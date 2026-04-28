@@ -3484,7 +3484,8 @@
                         signOut();
                         throw new Error('Sessão expirou — faça login de novo');
                     }
-                    throw new Error(data.error || `Erro ${res.status}`);
+                    const detail = data.detail ? ` — ${data.detail}` : '';
+                    throw new Error((data.error || `Erro ${res.status}`) + detail);
                 }
                 applyAIWorkflow(data.workflow);
                 closeModal();

@@ -59,6 +59,19 @@ interface AIWorkflow {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+    try {
+        return await innerHandler(req, res);
+    } catch (err: any) {
+        console.error('[generate-workflow] erro não tratado:', err);
+        return res.status(500).json({
+            error: 'Erro inesperado no servidor',
+            detail: String(err?.message || err),
+            stack: err?.stack ? String(err.stack).split('\n').slice(0, 5).join(' | ') : undefined,
+        });
+    }
+}
+
+async function innerHandler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method not allowed' });
     }
