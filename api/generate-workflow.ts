@@ -1,7 +1,8 @@
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Anthropic from '@anthropic-ai/sdk';
 import { jwtVerify, createRemoteJWKSet } from 'jose';
 
-export const config = { runtime: 'nodejs', maxDuration: 60 };
+export const config = { maxDuration: 60 };
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const ALLOWED_EMAILS = (process.env.ALLOWED_EMAILS || 'grec@cin.ufpe.br,giordanorec@gmail.com')
@@ -10,14 +11,14 @@ const ALLOWED_EMAILS = (process.env.ALLOWED_EMAILS || 'grec@cin.ufpe.br,giordano
 const JWKS = createRemoteJWKSet(new URL('https://www.googleapis.com/oauth2/v3/certs'));
 
 async function verifyGoogleJWT(token: string): Promise<{ email: string; name?: string }> {
-    if (!GOOGLE_CLIENT_ID) throw new Error('GOOGLE_CLIENT_ID env var not set');
+    if (!GOOGLE_CLIENT_ID) throw new Error('GOOGLE_CLIENT_ID env var não configurada');
     const { payload } = await jwtVerify(token, JWKS, {
         issuer: ['https://accounts.google.com', 'accounts.google.com'],
         audience: GOOGLE_CLIENT_ID,
     });
     const p = payload as { email?: string; email_verified?: boolean; name?: string };
-    if (!p.email_verified) throw new Error('email not verified');
-    if (!p.email) throw new Error('no email in token');
+    if (!p.email_verified) throw new Error('email não verificado');
+    if (!p.email) throw new Error('email ausente do token');
     return { email: p.email.toLowerCase(), name: p.name };
 }
 
@@ -57,51 +58,37 @@ interface AIWorkflow {
     connections: Array<{ fromIdx: number; fromOutput: number; toIdx: number; toInput: number; needsAdapter?: boolean; label?: string }>;
 }
 
-function jsonResponse(body: unknown, status = 200): Response {
-    return new Response(JSON.stringify(body), {
-        status,
-        headers: { 'content-type': 'application/json' },
-    });
-}
-
-export default async function handler(request: Request): Promise<Response> {
-    if (request.method !== 'POST') {
-        return jsonResponse({ error: 'Method not allowed' }, 405);
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+    if (req.method !== 'POST') {
+        return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    const authHeader = request.headers.get('authorization') || '';
+    const authHeader = (req.headers['authorization'] || '') as string;
     const token = authHeader.replace(/^Bearer\s+/i, '').trim();
-    if (!token) return jsonResponse({ error: 'Faltando token de autenticação' }, 401);
+    if (!token) return res.status(401).json({ error: 'Faltando token de autenticação' });
 
     let userEmail: string;
     try {
         const verified = await verifyGoogleJWT(token);
         userEmail = verified.email;
     } catch (err: any) {
-        return jsonResponse({ error: 'Token inválido', detail: String(err.message || err) }, 401);
+        return res.status(401).json({ error: 'Token inválido', detail: String(err?.message || err) });
     }
 
     if (!ALLOWED_EMAILS.includes(userEmail)) {
-        return jsonResponse({ error: `Acesso negado para ${userEmail}` }, 403);
+        return res.status(403).json({ error: `Acesso negado para ${userEmail}` });
     }
 
-    let body: { prompt?: string; catalog?: Record<string, unknown> };
-    try {
-        body = await request.json();
-    } catch {
-        return jsonResponse({ error: 'Corpo JSON inválido' }, 400);
-    }
-
+    const body = req.body as { prompt?: string; catalog?: Record<string, unknown> } || {};
     const prompt = (body.prompt || '').trim();
     const catalog = body.catalog;
-    if (!prompt) return jsonResponse({ error: 'Falta o prompt' }, 400);
-    if (!catalog || typeof catalog !== 'object') return jsonResponse({ error: 'Falta o catálogo' }, 400);
+    if (!prompt) return res.status(400).json({ error: 'Falta o prompt' });
+    if (!catalog || typeof catalog !== 'object') return res.status(400).json({ error: 'Falta o catálogo' });
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) return jsonResponse({ error: 'ANTHROPIC_API_KEY não configurada' }, 500);
+    if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY não configurada' });
 
     const client = new Anthropic({ apiKey });
-
     const systemPrompt = SYSTEM_PROMPT.replace('{{CATALOG}}', JSON.stringify(catalog));
 
     let response;
@@ -113,7 +100,7 @@ export default async function handler(request: Request): Promise<Response> {
             messages: [{ role: 'user', content: prompt }],
         });
     } catch (err: any) {
-        return jsonResponse({ error: 'Falha ao chamar Claude', detail: String(err.message || err) }, 502);
+        return res.status(502).json({ error: 'Falha ao chamar Claude', detail: String(err?.message || err) });
     }
 
     const text = response.content
@@ -127,14 +114,14 @@ export default async function handler(request: Request): Promise<Response> {
         const cleaned = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
         workflow = JSON.parse(cleaned);
     } catch {
-        return jsonResponse({ error: 'Claude retornou JSON inválido', raw: text }, 502);
+        return res.status(502).json({ error: 'Claude retornou JSON inválido', raw: text });
     }
 
     if (!Array.isArray(workflow.modules) || !Array.isArray(workflow.connections)) {
-        return jsonResponse({ error: 'Estrutura do workflow inválida', raw: text }, 502);
+        return res.status(502).json({ error: 'Estrutura do workflow inválida', raw: text });
     }
 
-    return jsonResponse({
+    return res.status(200).json({
         workflow,
         user: { email: userEmail },
         usage: response.usage,
