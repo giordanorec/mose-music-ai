@@ -21,6 +21,8 @@
 
     <!-- Iconify no head pra carregar ANTES do DOM -->
     <script src="https://code.iconify.design/iconify-icon/2.1.0/iconify-icon.min.js"></script>
+    <!-- Google Identity Services (login) -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script>
         window.IconifyProviders = {
             '': {
@@ -207,6 +209,50 @@
         }
         .header-btn.active:hover {
             background: var(--cat-input-soft); /* mantém destaque mesmo no hover */
+        }
+
+        .header-btn.ai-btn {
+            background: linear-gradient(135deg, rgba(154,220,255,0.15), rgba(168,140,255,0.18));
+            border-color: rgba(168,140,255,0.45);
+            color: #C8B5FF;
+        }
+        .header-btn.ai-btn:hover {
+            background: linear-gradient(135deg, rgba(154,220,255,0.28), rgba(168,140,255,0.32));
+            border-color: rgba(168,140,255,0.7);
+            color: #FFF;
+        }
+        .header-btn.ai-btn svg { color: #C8B5FF; }
+        .header-btn.ai-btn:hover svg { color: #FFF; }
+
+        .user-widget {
+            display: flex; align-items: center;
+            gap: 6px;
+            padding: 0.4rem 0.7rem;
+            border-radius: 8px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            cursor: pointer;
+            color: var(--ink-soft);
+            background: transparent;
+            border: 1px solid transparent;
+            transition: all 0.15s;
+            max-width: 180px;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+        }
+        .user-widget:hover {
+            background: rgba(255,255,255,0.06);
+            color: var(--ink);
+        }
+        .user-widget.signed-in {
+            color: #5BD18E;
+            border-color: rgba(91,209,142,0.3);
+        }
+        .user-widget.signed-in::before {
+            content: '●';
+            font-size: 0.5rem;
+            color: #5BD18E;
         }
 
         .header-btn.danger { color: var(--t-ctrl); }
@@ -1446,6 +1492,10 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
                     <span>Templates</span>
                 </button>
+                <button class="header-btn ai-btn" onclick="openAIModal()" title="Gerar workflow a partir de descrição em linguagem natural">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.5 4.5L18 8l-4.5 1.5L12 14l-1.5-4.5L6 8l4.5-1.5L12 2z"/><path d="M5 16l.7 2.1L8 19l-2.3.7L5 22l-.7-2.1L2 19l2.3-.7L5 16z"/><path d="M19 14l.5 1.5L21 16l-1.5.5L19 18l-.5-1.5L17 16l1.5-.5L19 14z"/></svg>
+                    <span>Gerar com IA</span>
+                </button>
                 <button class="header-btn" onclick="addPostIt()" title="Adicionar nota adesiva">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                     <span>Nota</span>
@@ -1461,6 +1511,10 @@
                 <button class="header-btn icon-only danger" onclick="clearAll()" title="Limpar tudo">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
                 </button>
+                <div class="header-sep"></div>
+                <div class="user-widget" id="user-widget" onclick="openAuthModal()" title="Login Google">
+                    <span id="user-widget-text">Entrar</span>
+                </div>
             </div>
         </div>
 
@@ -3237,6 +3291,284 @@
         window.closeModal = function() {
             document.getElementById('modal-root').innerHTML = '';
         };
+
+        // ============ AUTH (Google) + AI GENERATION ============
+        const aiAuthState = {
+            googleClientId: null,
+            initialized: false,
+            jwt: localStorage.getItem('mose-jwt') || null,
+            email: localStorage.getItem('mose-email') || null,
+            allowedEmails: [],
+        };
+
+        async function bootstrapAuth() {
+            try {
+                const res = await fetch('/api/config');
+                if (res.ok) {
+                    const cfg = await res.json();
+                    aiAuthState.googleClientId = cfg.googleClientId || null;
+                    aiAuthState.allowedEmails = cfg.allowedEmails || [];
+                }
+            } catch (e) {
+                console.warn('[Auth] config indisponível:', e);
+            }
+            updateUserWidget();
+            initGoogleAuthIfReady();
+        }
+
+        function initGoogleAuthIfReady() {
+            if (aiAuthState.initialized) return;
+            if (!aiAuthState.googleClientId) return;
+            if (typeof google === 'undefined' || !google.accounts || !google.accounts.id) {
+                setTimeout(initGoogleAuthIfReady, 250);
+                return;
+            }
+            google.accounts.id.initialize({
+                client_id: aiAuthState.googleClientId,
+                callback: handleGoogleCredential,
+                auto_select: false,
+                cancel_on_tap_outside: true,
+            });
+            aiAuthState.initialized = true;
+        }
+
+        function handleGoogleCredential(response) {
+            aiAuthState.jwt = response.credential;
+            try {
+                const payload = JSON.parse(atob(response.credential.split('.')[1]));
+                aiAuthState.email = (payload.email || '').toLowerCase();
+                localStorage.setItem('mose-jwt', aiAuthState.jwt);
+                localStorage.setItem('mose-email', aiAuthState.email);
+            } catch (e) { console.warn('[Auth] decode falhou', e); }
+            updateUserWidget();
+            closeModal();
+            showToast(`Logado: ${aiAuthState.email}`);
+        }
+
+        window.signOut = function() {
+            aiAuthState.jwt = null;
+            aiAuthState.email = null;
+            localStorage.removeItem('mose-jwt');
+            localStorage.removeItem('mose-email');
+            if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
+                google.accounts.id.disableAutoSelect();
+            }
+            updateUserWidget();
+            showToast('Sessão encerrada');
+        };
+
+        function updateUserWidget() {
+            const w = document.getElementById('user-widget');
+            const t = document.getElementById('user-widget-text');
+            if (!w || !t) return;
+            if (aiAuthState.email) {
+                w.classList.add('signed-in');
+                t.textContent = aiAuthState.email.split('@')[0];
+                w.title = `${aiAuthState.email} — clique pra opções`;
+            } else {
+                w.classList.remove('signed-in');
+                t.textContent = 'Entrar';
+                w.title = 'Login Google (para usar IA)';
+            }
+        }
+
+        window.openAuthModal = function() {
+            const root = document.getElementById('modal-root');
+            const isSignedIn = !!aiAuthState.email;
+            root.innerHTML = `
+                <div class="modal-backdrop show" onclick="if(event.target===this) closeModal()">
+                    <div class="modal" style="max-width: 380px;">
+                        <button class="modal-close" onclick="closeModal()">×</button>
+                        <div class="modal-title">${isSignedIn ? 'Sua conta' : 'Login'}</div>
+                        ${isSignedIn ? `
+                            <p style="margin: 16px 0 4px; color: var(--ink); line-height: 1.45;">
+                                Logado como<br><strong>${aiAuthState.email}</strong>
+                            </p>
+                            <div class="modal-actions" style="margin-top: 22px;">
+                                <button class="header-btn" onclick="closeModal()">Fechar</button>
+                                <button class="header-btn danger" onclick="signOut(); closeModal();">Sair</button>
+                            </div>
+                        ` : `
+                            <p style="margin: 14px 0; color: var(--ink-soft); line-height: 1.5; font-size: 0.85rem;">
+                                Faça login com sua conta Google pra liberar a geração de workflows com IA.
+                                Apenas usuários autorizados podem chamar a API.
+                            </p>
+                            <div id="google-signin-btn" style="display:flex; justify-content:center; margin: 18px 0;"></div>
+                            ${!aiAuthState.googleClientId ? '<p style="color:var(--t-ctrl); font-size:0.78rem; text-align:center;">⚠ <code>GOOGLE_CLIENT_ID</code> não configurado no servidor ainda.</p>' : ''}
+                        `}
+                    </div>
+                </div>
+            `;
+            if (!isSignedIn && aiAuthState.googleClientId) {
+                initGoogleAuthIfReady();
+                const tryRender = (tries = 0) => {
+                    const target = document.getElementById('google-signin-btn');
+                    if (!target) return;
+                    if (typeof google === 'undefined' || !google.accounts || !google.accounts.id) {
+                        if (tries < 30) setTimeout(() => tryRender(tries + 1), 100);
+                        return;
+                    }
+                    google.accounts.id.renderButton(target, {
+                        theme: 'filled_blue', size: 'large', text: 'signin_with', shape: 'pill',
+                    });
+                };
+                tryRender();
+            }
+        };
+
+        window.openAIModal = function() {
+            if (!aiAuthState.email) {
+                openAuthModal();
+                return;
+            }
+            const root = document.getElementById('modal-root');
+            root.innerHTML = `
+                <div class="modal-backdrop show" onclick="if(event.target===this) closeModal()">
+                    <div class="modal" style="max-width: 540px;">
+                        <button class="modal-close" onclick="closeModal()">×</button>
+                        <div class="modal-title">✨ Gerar workflow com IA</div>
+                        <p style="margin: 12px 0 6px; color: var(--ink-soft); font-size: 0.82rem; line-height: 1.5;">
+                            Descreva em linguagem natural o sistema que você quer compor. Claude (Sonnet 4.6) propõe um workflow usando os módulos disponíveis.
+                        </p>
+                        <textarea id="ai-prompt-input" placeholder="Ex: 'Transcrever podcasts longos com identificação de speakers e gerar resumo em texto'"
+                            style="width: 100%; min-height: 130px; padding: 12px; margin: 12px 0;
+                                   background: var(--paper-1); border: 1px solid var(--paper-3);
+                                   border-radius: 8px; color: var(--ink); font-family: inherit;
+                                   font-size: 0.9rem; line-height: 1.5; resize: vertical;
+                                   box-sizing: border-box; outline: none;"></textarea>
+                        <div id="ai-error" style="display:none; color: var(--t-ctrl); font-size:0.82rem; margin: 8px 0;"></div>
+                        <div class="modal-actions" style="margin-top: 16px; display:flex; justify-content:space-between; align-items:center; gap:10px;">
+                            <span style="font-size:0.7rem; color: var(--ink-soft); flex:1;">⚠ Substitui o workflow atual</span>
+                            <button class="header-btn" onclick="closeModal()">Cancelar</button>
+                            <button class="header-btn ai-btn" id="ai-generate-btn" onclick="runAIGeneration()">
+                                <span id="ai-btn-label">Gerar</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            setTimeout(() => {
+                const ta = document.getElementById('ai-prompt-input');
+                if (ta) ta.focus();
+            }, 50);
+        };
+
+        window.runAIGeneration = async function() {
+            const promptEl = document.getElementById('ai-prompt-input');
+            const btn = document.getElementById('ai-generate-btn');
+            const lbl = document.getElementById('ai-btn-label');
+            const errEl = document.getElementById('ai-error');
+            const prompt = (promptEl?.value || '').trim();
+            if (!prompt) { promptEl?.focus(); return; }
+            if (!aiAuthState.jwt) {
+                errEl.textContent = 'Você precisa estar logado.';
+                errEl.style.display = 'block';
+                return;
+            }
+            btn.disabled = true;
+            lbl.textContent = 'Gerando…';
+            errEl.style.display = 'none';
+            try {
+                const catalog = buildAICatalog();
+                const res = await fetch('/api/generate-workflow', {
+                    method: 'POST',
+                    headers: {
+                        'content-type': 'application/json',
+                        'authorization': 'Bearer ' + aiAuthState.jwt,
+                    },
+                    body: JSON.stringify({ prompt, catalog }),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    if (res.status === 401) {
+                        signOut();
+                        throw new Error('Sessão expirou — faça login de novo');
+                    }
+                    throw new Error(data.error || `Erro ${res.status}`);
+                }
+                applyAIWorkflow(data.workflow);
+                closeModal();
+                showToast(`✨ "${data.workflow.title || 'Workflow'}" criado`);
+            } catch (e) {
+                errEl.textContent = '❌ ' + (e.message || String(e));
+                errEl.style.display = 'block';
+                btn.disabled = false;
+                lbl.textContent = 'Gerar';
+            }
+        };
+
+        function buildAICatalog() {
+            const out = {};
+            for (const [puckId, d] of Object.entries(DB)) {
+                out[puckId] = {
+                    name: d.name,
+                    type: d.type,
+                    desc: d.desc,
+                    inputs: (d.inputs || []).map(i => ({ t: i.t, req: !!i.req })),
+                    outputs: (d.outputs || []).map(o => ({ t: o.t, req: !!o.req })),
+                };
+            }
+            return out;
+        }
+
+        function applyAIWorkflow(workflow) {
+            if (!workflow) return;
+            placed = []; wires = []; undoStack = [];
+            document.querySelectorAll('.placed-puck').forEach(el => el.remove());
+            document.getElementById('wires-svg').innerHTML = '';
+
+            workflowMeta = {
+                title: workflow.title || '',
+                description: workflow.description || ''
+            };
+            if (typeof updateHeaderTitle === 'function') updateHeaderTitle();
+
+            const placedIds = [];
+            (workflow.modules || []).forEach(m => {
+                if (!DB[m.puckId]) {
+                    console.warn('[AI] puckId desconhecido ignorado:', m.puckId);
+                    placedIds.push(null);
+                    return;
+                }
+                const x = Number.isFinite(m.x) ? m.x : 100;
+                const y = Number.isFinite(m.y) ? m.y : 200;
+                const id = placePuck(m.puckId, x, y, { noSave: true, noUndo: true });
+                placedIds.push(id);
+            });
+
+            (workflow.connections || []).forEach(c => {
+                const srcId = placedIds[c.fromIdx];
+                const tgtId = placedIds[c.toIdx];
+                if (!srcId || !tgtId) return;
+                const src = placed.find(p => p.placedId === srcId);
+                const tgt = placed.find(p => p.placedId === tgtId);
+                if (!src || !tgt) return;
+                const srcOut = src.outputs?.[c.fromOutput];
+                const tgtIn = tgt.inputs?.[c.toInput];
+                if (!srcOut || !tgtIn) return;
+                wires.push({
+                    id: `w_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+                    sourcePlacedId: srcId, sourceIdx: c.fromOutput,
+                    targetPlacedId: tgtId, targetIdx: c.toInput,
+                    type: srcOut.t,
+                    targetType: tgtIn.t,
+                    needsAdapter: srcOut.t !== tgtIn.t,
+                    label: c.label || ''
+                });
+            });
+
+            renderWires();
+            updateStats();
+            updateEmpty();
+            saveWorkflow();
+        }
+
+        // Bootstrap
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', bootstrapAuth);
+        } else {
+            bootstrapAuth();
+        }
 
         // ============ LEGENDA ============
         window.openLegendModal = function() {

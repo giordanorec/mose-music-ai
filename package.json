@@ -1,0 +1,10 @@
+{
+  "name": "mose-music-ai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Music.AI Workflow — mesa de composição visual",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.91.1",
+    "jose": "^6.2.3"
+  }
+}
