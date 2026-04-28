@@ -22,3 +22,4 @@ yarn-error.log*
 
 # Versões antigas (se quiser manter no histórico, remova essas linhas)
 v[0-9]*_*.html
+.vercel
