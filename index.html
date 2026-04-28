@@ -702,7 +702,7 @@
             display: none;
         }
 
-        body.show-labels .placed-label { display: block; }
+        body.show-module-labels .placed-label { display: block; }
 
         /* GHOST */
         .drag-ghost {
@@ -974,8 +974,8 @@
         @keyframes wireDash { to { stroke-dashoffset: -10; } }
 
         .wire-label, .wire-label-bg { display: none; }
-        body.show-labels .wire-label,
-        body.show-labels .wire-label-bg { display: block; }
+        body.show-wire-labels .wire-label,
+        body.show-wire-labels .wire-label-bg { display: block; }
 
         /* Wire warning (semantic) */
         .wire-path.semantic-warning {
@@ -1359,8 +1359,12 @@
                 <button class="header-btn icon-only" id="theme-btn" onclick="openThemePicker()" title="Trocar tema de ícones">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r="1.5"/><circle cx="17.5" cy="10.5" r="1.5"/><circle cx="8.5" cy="7.5" r="1.5"/><circle cx="6.5" cy="12.5" r="1.5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>
                 </button>
-                <div class="header-toggle" id="toggle-labels-btn" onclick="toggleLabels()" title="Mostrar/ocultar nomes dos cabos">
-                    <span class="header-toggle-label">Nomes</span>
+                <div class="header-toggle" id="toggle-module-labels-btn" onclick="toggleModuleLabels()" title="Mostrar/ocultar nomes dos módulos">
+                    <span class="header-toggle-label">Módulos</span>
+                    <span class="header-toggle-switch"><span class="header-toggle-knob"></span></span>
+                </div>
+                <div class="header-toggle" id="toggle-wire-labels-btn" onclick="toggleWireLabels()" title="Mostrar/ocultar nomes das conexões">
+                    <span class="header-toggle-label">Conexões</span>
                     <span class="header-toggle-switch"><span class="header-toggle-knob"></span></span>
                 </div>
                 <button class="header-btn" onclick="openTemplatesModal()" title="Templates de workflows">
@@ -2038,7 +2042,8 @@
         let wireState = null;
         let multiDragState = null;
         let rubberBand = null;
-        let showLabels = false;
+        let showModuleLabels = false;
+        let showWireLabels = false;
         let zoom = 1;
         let pan = { x: 0, y: 0 };
         let undoStack = [];
@@ -2050,17 +2055,26 @@
         const MAX_UNDO = 30;
 
         // ============ TOGGLES ============
-        window.toggleLabels = function() {
-            showLabels = !showLabels;
-            document.body.classList.toggle('show-labels', showLabels);
+        window.toggleModuleLabels = function() {
+            showModuleLabels = !showModuleLabels;
+            document.body.classList.toggle('show-module-labels', showModuleLabels);
+            updateToggleBtn();
+            saveWorkflow();
+        };
+
+        window.toggleWireLabels = function() {
+            showWireLabels = !showWireLabels;
+            document.body.classList.toggle('show-wire-labels', showWireLabels);
             updateToggleBtn();
             renderWires();
             saveWorkflow();
         };
 
         function updateToggleBtn() {
-            const btn = document.getElementById('toggle-labels-btn');
-            if (btn) btn.classList.toggle('on', showLabels);
+            const moduleBtn = document.getElementById('toggle-module-labels-btn');
+            const wireBtn = document.getElementById('toggle-wire-labels-btn');
+            if (moduleBtn) moduleBtn.classList.toggle('on', showModuleLabels);
+            if (wireBtn) wireBtn.classList.toggle('on', showWireLabels);
         }
 
         // ============ RENDER INVENTÁRIO ============
@@ -3712,7 +3726,7 @@
                         x: p.x, y: p.y, textContent: p.textContent || null,
                         customName: p.customName || null
                     })),
-                    wires, postIts, showLabels, zoom, pan,
+                    wires, postIts, showModuleLabels, showWireLabels, zoom, pan,
                     workflowMeta,
                     currentWorkflowId, currentWorkflowName,
                     savedAt: new Date().toISOString()
@@ -3762,11 +3776,16 @@
             document.querySelectorAll('.placed-puck, .post-it').forEach(el => el.remove());
             document.getElementById('wires-svg').innerHTML = '';
 
+            // Compat: workflow antigo guardava só `showLabels` (aplicava aos dois)
             if (typeof data.showLabels === 'boolean') {
-                showLabels = data.showLabels;
-                document.body.classList.toggle('show-labels', showLabels);
-                updateToggleBtn();
+                showModuleLabels = data.showLabels;
+                showWireLabels = data.showLabels;
             }
+            if (typeof data.showModuleLabels === 'boolean') showModuleLabels = data.showModuleLabels;
+            if (typeof data.showWireLabels === 'boolean') showWireLabels = data.showWireLabels;
+            document.body.classList.toggle('show-module-labels', showModuleLabels);
+            document.body.classList.toggle('show-wire-labels', showWireLabels);
+            updateToggleBtn();
             if (typeof data.zoom === 'number') zoom = data.zoom;
             if (data.pan) pan = data.pan;
             applyTransform();
@@ -3839,7 +3858,7 @@
                     textContent: p.textContent || null,
                     customName: p.customName || null
                 })),
-                wires, postIts, showLabels, zoom, pan,
+                wires, postIts, showModuleLabels, showWireLabels, zoom, pan,
                 workflowMeta,
                 version: 4
             };
@@ -4051,7 +4070,7 @@
                     version: 4,
                     workflowMeta,
                     placed: placed.map(p => ({ placedId: p.placedId, puckId: p.puckId, x: p.x, y: p.y, textContent: p.textContent || null, customName: p.customName || null })),
-                    wires, postIts, showLabels,
+                    wires, postIts, showModuleLabels, showWireLabels,
                     exportedAt: new Date().toISOString()
                 };
                 const json = JSON.stringify(data, null, 2);
