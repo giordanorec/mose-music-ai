@@ -6,5 +6,8 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.91.1",
     "jose": "^6.2.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5"
   }
 }
